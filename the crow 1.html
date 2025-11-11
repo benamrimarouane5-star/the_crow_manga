@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="اقرأ مانغا الغراب مجانًا - قصة مغامرات في عالم خيالي مليء بالأسرار.">
+    <meta name="keywords" content="مانغا, الغراب, manga, crow, fantasy">
+    <title>مانغا الغراب - قراءة مجانية</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+        import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js';
+
+        window.firebaseModules = { initializeApp, getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, getStorage, ref, uploadBytes, getDownloadURL, getMessaging, getToken };
+    </script>
+
+    <style>
+        body { 
+            font-family: 'Noto Sans Arabic', sans-serif; 
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab); 
+            background-size: 400% 400%; 
+            animation: gradientShift 15s ease infinite; 
+            color: #333; 
+            margin: 0; 
+            padding: 0; 
+            line-height: 1.6; 
+            overflow-x: hidden;
+            direction: rtl;
+        }
+        @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        header { 
+            background: rgba(0, 0, 0, 0.8); 
+            color: #fff; 
+            text-align: center; 
+            padding: 30px 20px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5); 
+            position: relative;
+        }
+        .lang-toggle, #dark-toggle, #notify-toggle {
+            position: absolute; top: 10px; background: rgba(255,255,255,0.2); border: none; color: #fff; padding: 8px 12px; border-radius: 20px; cursor: pointer; font-size: 14px;
+            z-index: 10; /* لضمان عدم التداخل */
+            transition: all 0.3s ease; /* تأثير انتقالي ناعم */
+        }
+        
+        .lang-toggle { right: 10px; }
+        #dark-toggle { left: 10px; }
+        #notify-toggle { left: 80px; }
+
+        /* تحسين للأيقونات */
+        #dark-toggle i, #notify-toggle i {
+            font-size: 16px;
+            display: block;
+            margin: 0 auto;
+        }
+        /* تحسين للأيقونات */
+        #dark-toggle i, #notify-toggle i, .lang-toggle i {
+            font-size: 16px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .search-container {
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+            display: flex; align-items: center; background: rgba(255,255,255,0.2); border-radius: 25px; padding: 5px 12px; width: 200px;
+            z-index: 10; /* لضمان عدم التداخل مع الأزرار */
+            transition: all 0.3s ease;
+        }
+        .search-container input { background: transparent; border: none; color: white; font-size: 14px; width: 100%; outline: none; }
+        .search-container input::placeholder { color: rgba(255,255,255,0.7); }
+        .search-container i { color: white; font-size: 16px; margin-left: 8px; }
+        .search-container:hover { 
+            background: rgba(255,255,255,0.3); 
+            width: 220px; /* توسيع طفيف عند التحويم للوضوح */
+        }
+
+        .cover { width: 100%; max-width: 400px; margin: 10px auto; display: block; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+        h1 { margin: 0; font-size: 3em; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+
+        .description { max-width: 800px; margin: 30px auto; padding: 25px; background: rgba(255, 255, 255, 0.9); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .chapters { display: flex; flex-direction: row; overflow-x: auto; gap: 25px; max-width: 900px; margin: 30px auto; padding: 10px 0; }
+        .chapters::-webkit-scrollbar { height: 8px; }
+        .chapters::-webkit-scrollbar-thumb { background: #667eea; border-radius: 4px; }
+
+        .chapter { background: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); min-width: 250px; flex-shrink: 0; }
+        .chapter img { max-width: 150px; height: auto; border-radius: 8px; margin-bottom: 10px; loading: lazy; }
+
+        .read-btn, .download-btn, .share-btn { background: linear-gradient(45deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 8px 16px; text-decoration: none; border-radius: 25px; display: inline-block; margin: 3px; font-weight: bold; font-size: 0.9em; }
+        .read-btn:hover, .download-btn:hover, .share-btn:hover { transform: scale(1.1); }
+
+        #comments { max-width: 800px; margin: 30px auto; padding: 25px; background: rgba(255, 255, 255, 0.9); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        #comment-form { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; }
+        #comment-form input, #comment-form textarea { padding: 12px; border: 2px solid #ddd; border-radius: 8px; }
+        #comment-form button { background: linear-gradient(45deg, #28a745, #20c997); color: #fff; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .comment { background: #f8f9fa; padding: 15px; margin: 15px 0; border-radius: 8px; border-right: 5px solid #667eea; }
+
+        footer { background: rgba(0, 0, 0, 0.9); color: #fff; text-align: center; padding: 25px; }
+        .social-links a { color: #fff; margin: 0 15px; font-size: 1.5em; text-decoration: none; }
+
+        #chapter-modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); }
+        #chapter-content { display: flex; flex-wrap: wrap; justify-content: center; padding: 20px; max-height: 90vh; overflow-y: auto; }
+        #chapter-content img { max-width: 200px; margin: 10px; border-radius: 8px; }
+        #chapter-content iframe { width: 100%; height: 80vh; border: none; margin: 10px; }
+        .close { position: absolute; top: 10px; right: 20px; font-size: 28px; color: white; cursor: pointer; }
+
+        /* أساليب الإدارة */
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #28a745;
+            --danger: #e74c3c;
+            --dark: #2d2d2d;
+            --light: #f8f9fa;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        .admin-container {
+            max-width: 900px;
+            margin: 20px auto;
+            background: rgba(0,0,0,0.7);
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            color: #fff;
+            display: none;
+        }
+        .admin-container.active { display: block; }
+        .admin-h1 { text-align: center; margin-bottom: 30px; font-size: 2.2em; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .admin-section {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            backdrop-filter: blur(10px);
+        }
+        .admin-section h3 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 1.4em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        input, textarea, select, button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border: none;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+        input, textarea, select {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.7); }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        button:hover { background: var(--secondary); transform: translateY(-2px); }
+        .btn-success { background: var(--success); }
+        .btn-danger { background: var(--danger); }
+        .btn-small {
+            width: auto;
+            padding: 6px 12px;
+            font-size: 0.9em;
+            display: inline-block;
+            margin: 0 5px;
+        }
+        .chapter-item {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .chapter-item img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; }
+        .chapter-info { flex: 1; min-width: 200px; }
+        .chapter-actions { display: flex; gap: 5px; }
+        .file-info { font-size: 0.9em; color: #aaa; margin-top: 5px; }
+        .upload-area {
+            border: 2px dashed rgba(255,255,255,0.4);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin: 10px 0;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .upload-area:hover { border-color: var(--primary); background: rgba(102, 126, 234, 0.1); }
+        .upload-area.dragover { border-color: var(--success); background: rgba(40, 167, 69, 0.2); }
+        .lang-tabs { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .lang-tab {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+        }
+        .lang-tab.active { background: var(--primary); }
+        .save-all { text-align: center; margin-top: 30px; }
+        .save-all button { font-size: 1.2em; padding: 15px 40px; border-radius: 50px; }
+        .password-prompt {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 1000;
+        }
+        .password-box {
+            background: white; color: #333; padding: 30px; border-radius: 16px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        .password-box input { background: #f8f9fa; color: #333; }
+        .password-box button { background: var(--primary); margin-top: 15px; }
+
+        /* نافذة التعديل */
+        #edit-modal {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center;
+        }
+        #edit-content {
+            background: rgba(0,0,0,0.8); padding: 30px; border-radius: 16px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto;
+        }
+        #edit-content h3 { color: #fff; text-align: center; }
+        .close-edit { position: absolute; top: 15px; right: 20px; font-size: 28px; color: #fff; cursor: pointer; }
+
+        @media (max-width: 600px) {
+            .chapter-item { flex-direction: column; align-items: flex-start; }
+            .chapter-actions { width: 100%; justify-content: flex-end; }
+            /* تحسين للشاشات الصغيرة: تقليل المسافات لتجنب التداخل */
+            #notify-toggle { left: 60px; }
+            .search-container { width: 150px; }
+            .lang-toggle, #dark-toggle, #notify-toggle { padding: 6px 10px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- محتوى القراءة (افتراضي) -->
+    <header>
+        <button class="lang-toggle" onclick="alert('اللغة غير مدعومة في النسخة المجانية')">
+            <i class="fas fa-globe"></i>
+        </button>
+        <button id="dark-toggle" onclick="toggleDarkMode()">
+            <i class="fas fa-sun"></i> <!-- يتبدل لقمر في الـ JS -->
+        </button>
+        <button id="notify-toggle" onclick="requestNotificationPermission()">
+            <i class="fas fa-bell"></i>
+        </button>
+
+        <div class="search-container">
+            <i class="fas fa-search"></i>
+            <input type="text" id="search-input" placeholder="ابحث..." oninput="filterChapters()">
+        </div>
+
+        <h1>مانغا الغراب</h1>
+        <img id="cover-img" src="" alt="غلاف" class="cover" loading="lazy">
+    </header>
+
+    <section class="description">
+        <h2>وصف القصة</h2>
+        <p id="story-desc">جاري التحميل...</p>
+    </section>
+
+    <section class="chapters" id="chapters-section"></section>
+
+    <section id="comments">
+        <h2>اترك تعليقك</h2>
+        <form id="comment-form">
+            <input type="text" id="name" placeholder="اسمك" required>
+            <textarea id="message" rows="4" required>تعليقك...</textarea>
+            <button type="submit">أرسل</button>
+        </form>
+        <div id="comments-list"></div>
+    </section>
+
+    <footer>
+        <div class="social-links">
+            <a href="https://www.instagram.com/the_crow_0000?igsh=eXFkcnVqdXhsZHU=" target="_blank"><i class="fab fa-instagram"></i></a>
+            <a href="https://www.facebook.com/profile.php?id=61557602322000" target="_blank"><i class="fab fa-facebook"></i></a>
+        </div>
+        <p>© 2025 جميع الحقوق محفوظة. بلال عبد الدين</p>
+    </footer>
+
+    <div id="chapter-modal">
+        <span class="close" onclick="closeChapterModal()">×</span>
+        <div id="chapter-content"></div>
+    </div>
+
+    <!-- محتوى الإدارة (مخفي افتراضياً) -->
+    <!-- حماية بكلمة مرور -->
+    <div id="password-prompt" class="password-prompt" style="display: none;">
+        <div class="password-box">
+            <h2>لوحة تحكم الكاتب</h2>
+            <p>أدخل كلمة المرور للمتابعة</p>
+            <input type="password" id="admin-password" placeholder="كلمة المرور" autocomplete="off">
+            <button onclick="checkAdminPassword()">دخول</button>
+            <p style="margin-top:15px; font-size:0.9em; color:#666;">
+                
+            </p>
+        </div>
+    </div>
+
+    <div class="admin-container" id="admin-panel">
+        <h1 class="admin-h1">لوحة تحكم الكاتب</h1>
+
+        <!-- تغيير الغلاف -->
+        <div class="admin-section">
+            <h3>تغيير غلاف الموقع</h3>
+            <div class="upload-area" onclick="document.getElementById('cover-upload').click()">
+                <i class="fas fa-cloud-upload-alt fa-3x"></i>
+                <p>اسحب الصورة هنا أو اضغط للرفع</p>
+                <input type="file" id="cover-upload" accept="image/*" style="display:none;">
+            </div>
+            <div id="cover-preview" style="margin-top:15px; text-align:center;"></div>
+        </div>
+
+        <!-- إضافة فصل جديد -->
+        <div class="admin-section">
+            <h3>إضافة فصل جديد</h3>
+            <div class="lang-tabs">
+                <div class="lang-tab active" data-lang="ar">العربية</div>
+                <div class="lang-tab" data-lang="en">English</div>
+                <div class="lang-tab" data-lang="fr">Français</div>
+            </div>
+
+            <div id="lang-ar">
+                <input type="text" id="title-ar" placeholder="عنوان الفصل (عربي)">
+                <textarea id="desc-ar" rows="2" placeholder="وصف مختصر (عربي)"></textarea>
+            </div>
+            <div id="lang-en" style="display:none;">
+                <input type="text" id="title-en" placeholder="Chapter Title (English)">
+                <textarea id="desc-en" rows="2" placeholder="Short description (English)"></textarea>
+            </div>
+            <div id="lang-fr" style="display:none;">
+                <input type="text" id="title-fr" placeholder="Titre du chapitre (Français)">
+                <textarea id="desc-fr" rows="2" placeholder="Description courte (Français)"></textarea>
+            </div>
+
+            <div class="upload-area" onclick="document.getElementById('preview-upload').click()">
+                <i class="fas fa-image fa-2x"></i><br>
+                <span>صورة معاينة الفصل</span>
+                <input type="file" id="preview-upload" accept="image/*" style="display:none;">
+            </div>
+            <div id="preview-preview" style="text-align:center; margin:10px 0;"></div>
+
+            <div class="upload-area" onclick="document.getElementById('chapter-file').click()">
+                <i class="fas fa-file-archive fa-2x"></i><br>
+                <span>ملف الفصل (.zip أو .pdf)</span>
+                <input type="file" id="chapter-file" accept=".zip,.pdf" style="display:none;">
+            </div>
+            <div id="file-info" class="file-info"></div>
+
+            <button onclick="addChapter()" class="btn-success">إضافة الفصل</button>
+        </div>
+
+        <!-- قائمة الفصول -->
+        <div class="admin-section">
+            <h3>الفصول الحالية (<span id="chapter-count">0</span>)</h3>
+            <div id="chapters-list"></div>
+        </div>
+
+        <!-- حفظ الكل -->
+        <div class="save-all">
+            <button onclick="saveAllData()" class="btn-success">
+                حفظ جميع البيانات في Firebase
+            </button>
+            <p style="margin-top:10px; font-size:0.9em; color:#aaa;">
+                → البيانات محفوظة تلقائياً في Firebase وستظهر للقراء
+            </p>
+        </div>
+    </div>
+
+    <!-- نافذة تعديل الفصل -->
+    <div id="edit-modal">
+        <div id="edit-content">
+            <span class="close-edit" onclick="closeEditModal()">×</span>
+            <h3>تعديل الفصل</h3>
+            <div class="lang-tabs">
+                <div class="lang-tab active" data-lang="ar">العربية</div>
+                <div class="lang-tab" data-lang="en">English</div>
+                <div class="lang-tab" data-lang="fr">Français</div>
+            </div>
+
+            <div id="edit-lang-ar">
+                <input type="text" id="edit-title-ar" placeholder="عنوان الفصل (عربي)">
+                <textarea id="edit-desc-ar" rows="2" placeholder="وصف مختصر (عربي)"></textarea>
+            </div>
+            <div id="edit-lang-en" style="display:none;">
+                <input type="text" id="edit-title-en" placeholder="Chapter Title (English)">
+                <textarea id="edit-desc-en" rows="2" placeholder="Short description (English)"></textarea>
+            </div>
+            <div id="edit-lang-fr" style="display:none;">
+                <input type="text" id="edit-title-fr" placeholder="Titre du chapitre (Français)">
+                <textarea id="edit-desc-fr" rows="2" placeholder="Description courte (Français)"></textarea>
+            </div>
+
+            <div class="upload-area" onclick="document.getElementById('edit-preview-upload').click()">
+                <i class="fas fa-image fa-2x"></i><br>
+                <span>تغيير صورة المعاينة</span>
+                <input type="file" id="edit-preview-upload" accept="image/*" style="display:none;">
+            </div>
+            <div id="edit-preview-preview" style="text-align:center; margin:10px 0;"></div>
+
+            <div class="upload-area" onclick="document.getElementById('edit-chapter-file').click()">
+                <i class="fas fa-file-archive fa-2x"></i><br>
+                <span>تغيير ملف الفصل</span>
+                <input type="file" id="edit-chapter-file" accept=".zip,.pdf" style="display:none;">
+            </div>
+            <div id="edit-file-info" class="file-info"></div>
+
+            <button onclick="saveEditedChapter()" class="btn-success">حفظ التغييرات</button>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase Config - استبدل بتكوين مشروعك من Firebase Console
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        const app = firebaseModules.initializeApp(firebaseConfig);
+        const db = firebaseModules.getFirestore(app);
+        const storage = firebaseModules.getStorage(app);
+        const messaging = firebaseModules.getMessaging(app);
+
+        // التبديل بين الأوضاع
+        const urlParams = new URLSearchParams(window.location.search);
+        const isAdmin = urlParams.get('mode') === 'admin';
+        if (isAdmin) {
+            document.body.style.background = 'linear-gradient(135deg, #1e3c72, #2a5298)';
+            document.getElementById('password-prompt').style.display = 'flex';
+            document.querySelector('header').style.display = 'none';
+            // إخفاء أقسام القراءة
+            document.querySelector('.description').style.display = 'none';
+            document.getElementById('chapters-section').style.display = 'none';
+            document.getElementById('comments').style.display = 'none';
+            document.querySelector('footer').style.display = 'none';
+            loadAdminData();
+        } else {
+            // وضع القراءة الافتراضي
+            loadReaderData();
+            setupCommentsListener();
+        }
+
+        // كود الإدارة
+        const ADMIN_PASSWORD = 'Bilal.abdedine';
+        let chaptersData = []; // لتخزين الفصول محلياً أثناء التحرير
+        let editingId = null;
+
+        function checkAdminPassword() {
+            const input = document.getElementById('admin-password').value.trim();
+            if (input === ADMIN_PASSWORD) {
+                document.getElementById('password-prompt').style.display = 'none';
+                document.getElementById('admin-panel').classList.add('active');
+                loadAdminData();
+            } else {
+                alert('كلمة المرور خاطئة!');
+            }
+        }
+
+        async function loadAdminData() {
+            const chaptersSnapshot = await firebaseModules.getDocs(firebaseModules.collection(db, 'chapters'));
+            chaptersData = chaptersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            updateChaptersList();
+            // تحميل الغلاف من Firestore (doc 'info' في collection 'manga')
+            const infoDoc = await firebaseModules.getDoc(firebaseModules.doc(db, 'manga', 'info'));
+            if (infoDoc.exists()) {
+                const info = infoDoc.data();
+                if (info.coverUrl) {
+                    document.getElementById('cover-preview').innerHTML = `<img src="${info.coverUrl}" style="max-width:200px; border-radius:12px; margin-top:10px;">`;
+                }
+            }
+        }
+
+        // === تبديل اللغات ===
+        function setupLangTabs(containerId) {
+            document.querySelectorAll(`#${containerId} .lang-tab`).forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll(`#${containerId} .lang-tab`).forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    const prefix = containerId === 'admin-panel' ? 'lang-' : 'edit-lang-';
+                    document.querySelectorAll(`#${containerId} [id^="${prefix}"]`).forEach(div => div.style.display = 'none');
+                    document.getElementById(prefix + tab.dataset.lang).style.display = 'block';
+                });
+            });
+        }
+        setupLangTabs('admin-panel');
+        setupLangTabs('edit-content');
+
+        // === رفع الغلاف ===
+        document.getElementById('cover-upload').addEventListener('change', async e => {
+            const file = e.target.files[0];
+            if (file) {
+                const storageRef = firebaseModules.ref(storage, 'covers/' + Date.now() + '_' + file.name);
+                await firebaseModules.uploadBytes(storageRef, file);
+                const url = await firebaseModules.getDownloadURL(storageRef);
+                // حفظ في Firestore
+                await firebaseModules.updateDoc(firebaseModules.doc(db, 'manga', 'info'), { coverUrl: url });
+                document.getElementById('cover-preview').innerHTML = `<img src="${url}" style="max-width:200px; border-radius:12px; margin-top:10px;">`;
+                alert('تم رفع الغلاف!');
+            }
+        });
+
+        // === رفع صورة المعاينة ===
+        let previewUrl = '';
+        document.getElementById('preview-upload').addEventListener('change', async e => {
+            const file = e.target.files[0];
+            if (file) {
+                const storageRef = firebaseModules.ref(storage, 'previews/' + Date.now() + '_' + file.name);
+                await firebaseModules.uploadBytes(storageRef, file);
+                previewUrl = await firebaseModules.getDownloadURL(storageRef);
+                document.getElementById('preview-preview').innerHTML = `<img src="${previewUrl}" style="max-width:120px; border-radius:8px; margin:10px;">`;
+            }
+        });
+
+        // === رفع ملف الفصل ===
+        let chapterUrl = '';
+        document.getElementById('chapter-file').addEventListener('change', async e => {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('file-info').textContent = `الملف: ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)`;
+                const storageRef = firebaseModules.ref(storage, 'chapters/' + Date.now() + '_' + file.name);
+                await firebaseModules.uploadBytes(storageRef, file);
+                chapterUrl = await firebaseModules.getDownloadURL(storageRef);
+            }
+        });
+
+        // === إضافة فصل جديد ===
+        async function addChapter() {
+            if (!previewUrl || !chapterUrl) return alert('ارفع المعاينة والملف أولاً!');
+            const title = { ar: document.getElementById('title-ar').value.trim(), en: document.getElementById('title-en').value.trim(), fr: document.getElementById('title-fr').value.trim() };
+            const desc = { ar: document.getElementById('desc-ar').value.trim(), en: document.getElementById('desc-en').value.trim(), fr: document.getElementById('desc-fr').value.trim() };
+            if (!title.ar || !desc.ar) return alert('أكمل العنوان والوصف بالعربية!');
+
+            try {
+                await firebaseModules.addDoc(firebaseModules.collection(db, 'chapters'), {
+                    title, desc, previewUrl, chapterUrl, views: 0, createdAt: new Date()
+                });
+                alert('تم إضافة الفصل بنجاح! سيظهر للقراء فوراً.');
+                loadAdminData(); // إعادة تحميل
+                clearChapterForm();
+                previewUrl = ''; chapterUrl = '';
+            } catch (e) {
+                alert('خطأ: ' + e.message);
+            }
+        }
+
+        function clearChapterForm() {
+            document.querySelectorAll('#title-ar, #title-en, #title-fr, #desc-ar, #desc-en, #desc-fr').forEach(el => el.value = '');
+            document.getElementById('preview-upload').value = '';
+            document.getElementById('chapter-file').value = '';
+            document.getElementById('preview-preview').innerHTML = '';
+            document.getElementById('file-info').textContent = '';
+        }
+
+        // === عرض الفصول ===
+        function updateChaptersList() {
+            const list = document.getElementById('chapters-list');
+            document.getElementById('chapter-count').textContent = chaptersData.length;
+            list.innerHTML = chaptersData.map((ch, i) => `
+                <div class="chapter-item">
+                    <img src="${ch.previewUrl}" alt="preview">
+                    <div class="chapter-info">
+                        <strong>${ch.title.ar || ch.title.en}</strong><br>
+                        <span style="font-size:0.9em; color:#ccc;">${ch.desc.ar || ch.desc.en}</span>
+                    </div>
+                    <div class="chapter-actions">
+                        <button class="btn-small" style="background:#ffc107;" onclick="openEditModal('${ch.id}')">تعديل</button>
+                        <button class="btn-small btn-danger" onclick="deleteChapter('${ch.id}')">حذف</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function deleteChapter(id) {
+            if (confirm('هل أنت متأكد من حذف هذا الفصل؟')) {
+                await firebaseModules.deleteDoc(firebaseModules.doc(db, 'chapters', id));
+                loadAdminData();
+            }
+        }
+
+        // === فتح نافذة التعديل ===
+        async function openEditModal(id) {
+            editingId = id;
+            const ch = chaptersData.find(c => c.id === id);
+            if (!ch) return;
+            document.getElementById('edit-title-ar').value = ch.title.ar;
+            document.getElementById('edit-title-en').value = ch.title.en;
+            document.getElementById('edit-title-fr').value = ch.title.fr;
+            document.getElementById('edit-desc-ar').value = ch.desc.ar;
+            document.getElementById('edit-desc-en').value = ch.desc.en;
+            document.getElementById('edit-desc-fr').value = ch.desc.fr;
+            document.getElementById('edit-preview-preview').innerHTML = `<img src="${ch.previewUrl}" style="max-width:120px; border-radius:8px; margin:10px;">`;
+            document.getElementById('edit-file-info').textContent = `الملف الحالي: ${ch.chapterUrl}`;
+            document.getElementById('edit-modal').style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').style.display = 'none';
+            editingId = null;
+        }
+
+        // === حفظ التعديلات ===
+        async function saveEditedChapter() {
+            if (!editingId) return;
+            const title = {
+                ar: document.getElementById('edit-title-ar').value.trim(),
+                en: document.getElementById('edit-title-en').value.trim(),
+                fr: document.getElementById('edit-title-fr').value.trim()
+            };
+            const desc = {
+                ar: document.getElementById('edit-desc-ar').value.trim(),
+                en: document.getElementById('edit-desc-en').value.trim(),
+                fr: document.getElementById('edit-desc-fr').value.trim()
+            };
+            if (!title.ar || !desc.ar) return alert('العنوان والوصف بالعربية مطلوبان!');
+
+            let previewUrlNew = chaptersData.find(c => c.id === editingId).previewUrl;
+            let chapterUrlNew = chaptersData.find(c => c.id === editingId).chapterUrl;
+
+            const previewFile = document.getElementById('edit-preview-upload').files[0];
+            const chapterFile = document.getElementById('edit-chapter-file').files[0];
+
+            if (previewFile) {
+                const storageRef = firebaseModules.ref(storage, 'previews/' + Date.now() + '_' + previewFile.name);
+                await firebaseModules.uploadBytes(storageRef, previewFile);
+                previewUrlNew = await firebaseModules.getDownloadURL(storageRef);
+            }
+            if (chapterFile) {
+                const storageRef = firebaseModules.ref(storage, 'chapters/' + Date.now() + '_' + chapterFile.name);
+                await firebaseModules.uploadBytes(storageRef, chapterFile);
+                chapterUrlNew = await firebaseModules.getDownloadURL(storageRef);
+            }
+
+            await firebaseModules.updateDoc(firebaseModules.doc(db, 'chapters', editingId), { title, desc, previewUrl: previewUrlNew, chapterUrl: chapterUrlNew });
+            alert('تم حفظ التغييرات بنجاح!');
+            loadAdminData();
+            closeEditModal();
+        }
+
+        // === رفع ملفات التعديل ===
+        document.getElementById('edit-preview-upload').addEventListener('change', async e => {
+            const file = e.target.files[0];
+            if (file) {
+                const storageRef = firebaseModules.ref(storage, 'previews/' + Date.now() + '_' + file.name);
+                await firebaseModules.uploadBytes(storageRef, file);
+                const url = await firebaseModules.getDownloadURL(storageRef);
+                document.getElementById('edit-preview-preview').innerHTML = `<img src="${url}" style="max-width:120px; border-radius:8px; margin:10px;">`;
+            }
+        });
+
+        document.getElementById('edit-chapter-file').addEventListener('change', async e => {
+            const file = e.target.files[0];
+            if (file) {
+                const storageRef = firebaseModules.ref(storage, 'chapters/' + Date.now() + '_' + file.name);
+                await firebaseModules.uploadBytes(storageRef, file);
+                const url = await firebaseModules.getDownloadURL(storageRef);
+                document.getElementById('edit-file-info').textContent = `الملف الجديد: ${file.name}`;
+            }
+        });
+
+        // === حفظ الكل ===
+        async function saveAllData() {
+            // حفظ الوصف إذا أضفته (مثال)
+            const desc = { ar: prompt('وصف القصة بالعربية:') || '' };
+            await firebaseModules.setDoc(firebaseModules.doc(db, 'manga', 'info'), { description: desc }, { merge: true });
+            alert('تم حفظ جميع البيانات في Firebase!');
+        }
+
+        // === دعم السحب والإفلات ===
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(event => {
+            document.body.addEventListener(event, e => e.preventDefault());
+        });
+        document.querySelectorAll('.upload-area').forEach(area => {
+            ['dragenter', 'dragover'].forEach(e => area.addEventListener(e, () => area.classList.add('dragover')));
+            ['dragleave', 'drop'].forEach(e => area.addEventListener(e, () => area.classList.remove('dragover')));
+            area.addEventListener('drop', e => {
+                const file = e.dataTransfer.files[0];
+                if (file) {
+                    // معالجة السحب (مثل رفع)
+                    const input = area.querySelector('input[type="file"]');
+                    input.files = e.dataTransfer.files;
+                    input.dispatchEvent(new Event('change'));
+                }
+            });
+        });
+
+        // كود القراءة
+        let unsubscribeChapters;
+        async function loadReaderData() {
+            // تحميل الغلاف والوصف
+            const infoDoc = await firebaseModules.getDoc(firebaseModules.doc(db, 'manga', 'info'));
+            if (infoDoc.exists()) {
+                const info = infoDoc.data();
+                if (info.coverUrl) document.getElementById('cover-img').src = info.coverUrl;
+                if (info.description && info.description.ar) document.getElementById('story-desc').textContent = info.description.ar;
+            }
+
+            // استماع للفصول في الوقت الفعلي
+            unsubscribeChapters = firebaseModules.onSnapshot(firebaseModules.collection(db, 'chapters'), (snapshot) => {
+                const chapters = snapshot.docs.map(doc => doc.data());
+                const chaptersHTML = chapters.map((ch, i) => `
+                    <div class="chapter">
+                        <h3>${ch.title.ar}</h3>
+                        <img src="${ch.previewUrl}" alt="" loading="lazy">
+                        <p>${ch.desc.ar}</p>
+                        <a href="#" class="read-btn" onclick="readChapter(${i}); return false;">اقرأ</a>
+                        <a href="#" class="download-btn" onclick="downloadChapter(${i}); return false;">PDF</a>
+                        <a href="#" class="share-btn" onclick="shareChapter(${i}); return false;">مشاركة</a>
+                    </div>
+                `).join('');
+                document.getElementById('chapters-section').innerHTML = chaptersHTML;
+                displayComments();
+            });
+        }
+
+        async function readChapter(i) {
+            // الحصول على الفصول من الـ snapshot (افترض global chapters array، أو أعد تحميل)
+            const chaptersSnapshot = await firebaseModules.getDocs(firebaseModules.collection(db, 'chapters'));
+            const chapters = chaptersSnapshot.docs.map(doc => doc.data());
+            const ch = chapters[i];
+            readChapterContent(ch);
+        }
+
+        async function readChapterContent(ch) {
+            const modal = document.getElementById('chapter-modal');
+            const content = document.getElementById('chapter-content');
+            content.innerHTML = '<p style="color:white;">جاري التحميل...</p>';
+            modal.style.display = 'block';
+
+            if (ch.chapterUrl.endsWith('.pdf')) {
+                content.innerHTML = `<iframe src="${ch.chapterUrl}"></iframe>`;
+            } else {
+                // لـ ZIP: fetch و JSZip
+                fetch(ch.chapterUrl).then(res => res.arrayBuffer()).then(buffer => {
+                    JSZip.loadAsync(buffer).then(zip => {
+                        content.innerHTML = '';
+                        zip.forEach((path, entry) => {
+                            if (/\.(jpe?g|png|gif)$/i.test(entry.name)) {
+                                entry.async('blob').then(blob => {
+                                    const img = document.createElement('img');
+                                    img.src = URL.createObjectURL(blob);
+                                    img.loading = 'lazy';
+                                    content.appendChild(img);
+                                });
+                            }
+                        });
+                    });
+                });
+            }
+        }
+
+        function closeChapterModal() {
+            document.getElementById('chapter-modal').style.display = 'none';
+        }
+
+        async function downloadChapter(i) {
+            const chaptersSnapshot = await firebaseModules.getDocs(firebaseModules.collection(db, 'chapters'));
+            const chapters = chaptersSnapshot.docs.map(doc => doc.data());
+            const ch = chapters[i];
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text(ch.title.ar, 10, 10);
+            doc.text(ch.desc.ar, 10, 20);
+            doc.save(`${ch.title.ar}.pdf`);
+        }
+
+        async function shareChapter(i) {
+            if (navigator.share) {
+                const chaptersSnapshot = await firebaseModules.getDocs(firebaseModules.collection(db, 'chapters'));
+                const chapters = chaptersSnapshot.docs.map(doc => doc.data());
+                const ch = chapters[i];
+                navigator.share({ title: ch.title.ar, text: ch.desc.ar, url: window.location.href });
+            } else {
+                alert('انسخ الرابط: ' + window.location.href);
+            }
+        }
+
+        function filterChapters() {
+            const term = document.getElementById('search-input').value.toLowerCase();
+            document.querySelectorAll('.chapter').forEach(ch => {
+                ch.style.display = ch.textContent.toLowerCase().includes(term) ? 'block' : 'none';
+            });
+        }
+
+        function toggleDarkMode() {
+            const body = document.body;
+            const darkIcon = document.getElementById('dark-toggle').querySelector('i');
+            const isDark = body.style.background.includes('#1a1a1a');
+            
+            if (isDark) {
+                body.style.background = 'linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab)';
+                darkIcon.className = 'fas fa-sun';
+            } else {
+                body.style.background = 'linear-gradient(-45deg, #1a1a1a, #2d1b69, #0f3460, #1e3c72)';
+                darkIcon.className = 'fas fa-moon';
+            }
+        }
+
+        // الإشعارات
+        async function requestNotificationPermission() {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                const token = await firebaseModules.getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY' }); // استبدل بـ VAPID key من Firebase
+                console.log('FCM Token:', token);
+                alert('تم تفعيل الإشعارات! ستتلقى إخطارات للفصول الجديدة.');
+            }
+        }
+
+        // التعليقات في Firestore
+        let unsubscribeComments;
+        async function setupCommentsListener() {
+            unsubscribeComments = firebaseModules.onSnapshot(firebaseModules.collection(db, 'comments'), (snapshot) => {
+                displayComments(snapshot.docs.map(doc => doc.data()));
+            });
+        }
+
+        document.getElementById('comment-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const name = document.getElementById('name').value.trim();
+            const message = document.getElementById('message').value.trim();
+            if (name && message) {
+                await firebaseModules.addDoc(firebaseModules.collection(db, 'comments'), { name, message, date: new Date().toLocaleString() });
+                e.target.reset();
+            }
+        });
+
+        function displayComments(comments) {
+            document.getElementById('comments-list').innerHTML = comments.map(c => `
+                <div class="comment">
+                    <strong>${c.name}</strong> (${c.date})<br>${c.message}
+                </div>
+            `).join('');
+        }
+
+        window.onclick = e => {
+            if (e.target.id === 'chapter-modal') closeChapterModal();
+        };
+
+        // تنظيف الاستماعات عند الخروج
+        window.addEventListener('beforeunload', () => {
+            if (unsubscribeChapters) unsubscribeChapters();
+            if (unsubscribeComments) unsubscribeComments();
+        });
+    </script>
+</body>
+</html>
